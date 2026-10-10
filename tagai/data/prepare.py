@@ -44,6 +44,8 @@ class PrepareStats:
     near_duplicates: int = 0
     source_saw_documents: dict = field(default_factory=dict)
     source_kept_documents: dict = field(default_factory=dict)
+    sources_missing_dump: list = field(default_factory=list)
+    sources_empty: list = field(default_factory=list)
 
     def note_lang(self, lang: str) -> None:
         self.lang_counts[lang] = self.lang_counts.get(lang, 0) + 1
@@ -78,6 +80,8 @@ class PrepareStats:
                 }
                 for sid in sorted(set(self.source_saw_documents) | set(self.source_kept_documents))
             },
+            "sources_missing_dump": sorted(self.sources_missing_dump),
+            "sources_empty": sorted(self.sources_empty),
             "seconds": round(self.seconds, 2),
         }
 
@@ -187,17 +191,34 @@ def iter_clean_documents(
         stats.source_saw_documents[source.id] = seen
         stats.source_kept_documents[source.id] = kept
         if seen == 0:
-            # A requested source that produced nothing means the dump was
-            # missing, unreadable or in an unexpected format. Continuing would
-            # silently build a corpus that is not the one that was asked for.
-            message = (
-                f"source {source.id} produced no documents at all "
-                f"(checked {source.url}). The dump is probably missing - run "
-                f"`python -m tagai.cli fetch --source {source.id}` first."
-            )
-            if cfg.strict_sources:
-                raise RuntimeError(message)
-            log.error(message)
+            dump = find_local_dump(paths, source.id)
+            if dump is None:
+                # Not downloaded yet. That is an expected state on a fresh
+                # machine with partial data, so it is reported and recorded
+                # rather than aborting the run.
+                note = (
+                    f"source {source.id} has no dump under {paths.raw / source.id}; "
+                    f"run `python -m tagai.cli fetch --source {source.id}` to include it"
+                )
+                stats.sources_missing_dump.append(source.id)
+                if cfg.strict_sources:
+                    log.warning("%s (continuing)", note)
+                else:
+                    log.error("%s", note)
+            else:
+                # The dump is present but produced nothing: unreadable file,
+                # unexpected format, or every document filtered out. That is a
+                # real failure, not a missing download.
+                message = (
+                    f"source {source.id} produced no documents from {dump} "
+                    f"({dump.stat().st_size} bytes). The dump is unreadable or in an "
+                    f"unexpected format - re-fetch it with "
+                    f"`python -m tagai.cli fetch --source {source.id}`."
+                )
+                stats.sources_empty.append(source.id)
+                if cfg.strict_sources:
+                    raise RuntimeError(message)
+                log.error("%s", message)
         log.info("source %s: %d documents seen, %d kept", source.id, seen, kept)
 
     stats.exact_duplicates = deduper.stats.exact_duplicates

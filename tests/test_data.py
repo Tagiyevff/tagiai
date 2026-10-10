@@ -433,3 +433,62 @@ def test_synthetic_pipeline_is_applied_to_a_corpus(tmp_path) -> None:
     manifest = build_corpus(paths, cfg, synthetic_texts=synth, progress_every=0)
     assert manifest["counts"]["train"] + manifest["counts"]["validation"] > 0
     assert manifest["synthetic"]["added"] >= 0
+
+
+def test_missing_dump_warns_but_does_not_abort(tmp_path) -> None:
+    """Requesting a source you have not downloaded yet is a normal state on a
+    fresh machine; it must be reported, not treated as corruption."""
+    from tagai.data.prepare import build_corpus
+
+    paths = PathsConfig(root=str(tmp_path / "partial"))
+    paths.ensure()
+    dump = _wiki_dump(paths, AZ_DOC)
+    cfg = DataConfig(sources=["azwiki", "azwiktionary"], min_chars=100, validation_fraction=0.1)
+
+    manifest = build_corpus(paths, cfg, progress_every=0)
+    stats = manifest["statistics"]
+    assert "azwiktionary" in stats["sources_missing_dump"]
+    assert stats["sources_empty"] == []
+    assert stats["source_yield"]["azwiki"]["kept"] > 0
+
+
+def test_present_but_unparseable_dump_is_a_hard_error(tmp_path) -> None:
+    """A dump that exists but yields nothing is a real failure, not a download
+    the user forgot. It must abort so a broken corpus is never trained on."""
+    from tagai.data.prepare import build_corpus
+
+    paths = PathsConfig(root=str(tmp_path / "broken"))
+    paths.ensure()
+    paths.raw.joinpath("azwiki").mkdir(parents=True, exist_ok=True)
+    paths.raw.joinpath("azwiki", "pages-articles.xml").write_text(
+        "<mediawiki><not-a-page/></mediawiki>", encoding="utf-8"
+    )
+    cfg = DataConfig(sources=["azwiki"], min_chars=100, strict_sources=True)
+    with pytest.raises(RuntimeError, match="produced no documents"):
+        build_corpus(paths, cfg, progress_every=0)
+
+
+def test_unparseable_dump_is_tolerated_when_strict_is_off(tmp_path) -> None:
+    from tagai.data.prepare import build_corpus
+
+    paths = PathsConfig(root=str(tmp_path / "lenient"))
+    paths.ensure()
+    paths.raw.joinpath("azwiki").mkdir(parents=True, exist_ok=True)
+    paths.raw.joinpath("azwiki", "pages-articles.xml").write_text("<mediawiki/>", encoding="utf-8")
+    cfg = DataConfig(sources=["azwiki"], min_chars=100, strict_sources=False, validation_fraction=0.1)
+    with pytest.raises(RuntimeError, match="nothing can be trained on"):
+        build_corpus(paths, cfg, progress_every=0)
+
+
+def _wiki_dump(paths: PathsConfig, text: str) -> Path:
+    d = paths.raw / "azwiki"
+    d.mkdir(parents=True, exist_ok=True)
+    p = d / "articles.xml"
+    p.write_text(
+        '<mediawiki xmlns="http://www.mediawiki.org/xml/export-0.11/">'
+        "<page><title>Səhifə</title><ns>0</ns><id>1</id><revision>"
+        f'<text xml:space="preserve">{text}</text></revision></page>'
+        "</mediawiki>",
+        encoding="utf-8",
+    )
+    return p

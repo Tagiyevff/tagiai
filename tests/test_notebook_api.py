@@ -26,14 +26,17 @@ def notebook_imports(path: Path) -> list[tuple[str, str]]:
         if cell["cell_type"] != "code":
             continue
         src = "".join(cell["source"])
-        for line in src.splitlines():
+        # Join parenthesised multi-line imports so "import (\n  a,\n  b,\n)"
+        # is parsed as a single logical statement.
+        flat = re.sub(r"import\s*\(([^)]*)\)", lambda m: "import " + " ".join(m.group(1).split()), src)
+        for line in flat.splitlines():
             m = IMPORT_RE.match(line)
             if not m:
                 continue
             module, names = m.group(1), m.group(2)
             for name in names.split(","):
-                name = name.strip()
-                if not name:
+                name = name.strip().strip("()")
+                if not name or not name.isidentifier():
                     continue
                 alias = name.split(" as ")[0].strip()
                 out.append((module, alias))

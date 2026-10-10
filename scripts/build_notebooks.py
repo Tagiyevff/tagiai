@@ -277,33 +277,79 @@ print("PENDING = licence not reviewed, EXCLUDED from the corpus.")
         """
 ## 7. Məlumatı yükləmək / Dataset download (resumable)
 
-Bu addım bir neçə yüz MB - 1.5 GB yaza bilər. `azwiki` dumpı təxminən 1 GB-dır.
-Yükləmə bölünür (resumable): dayananda yenidən başlayanda davam edir.
+Hər bir wikisource üçün multistream index-i (bir neçə MB) və **bir neçə bz2 stream**
+çəkilir - hər stream 100 məqalədir. Bu, ~1 GB-lıq tam dump-ı yükləmədən boru xəttini
+yoxlamağa imkan verir.
+
+`FULL_DOWNLOAD = True` olduqda hər layihənin tam dump-ı yüklənir (cəmi ~1.5 GB).
 """
     ),
     code(
         """
 #@title 7. Yükləmə / Download
-from tagai.data.download import download_file, list_wiki_dump_files, ensure_space
+from tagai.data.download import (
+    download_file, list_wiki_dump_files, read_multistream_index, extract_wiki_streams,
+)
 from tagai.data.sources import SourceRegistry
 
 paths = cfg["paths"]; paths.ensure()
 
-# Sürətli yoxlama üçün kiçik nümunə götürürük (təxminən 2500 məqalə).
-sample_dump = paths.raw / "azwiki" / "sample_articles.xml"
-if not sample_dump.exists():
-    from tagai.data.download import extract_wiki_streams, read_multistream_index
-    base = "https://dumps.wikimedia.org/azwiki/latest/"
-    files = list_wiki_dump_files(base)
-    idx = next(f for f in files if "multistream-index" in f["name"])
-    dump = next(f for f in files if "pages-articles-multistream.xml.bz2" in f["name"])
-    idx_path = paths.raw / "azwiki" / "pages-articles-multistream-index.txt.bz2"
-    download_file(base + idx["url"], idx_path)
-    offsets = read_multistream_index(idx_path)
-    print("streams in dump:", len(offsets))
-    xml = extract_wiki_streams(base + dump["url"], offsets, max_streams=25)
-    sample_dump.write_text(xml, encoding="utf-8")
-    print("wrote", sample_dump, xml.count("<page>"), "pages")
+FULL_DOWNLOAD = False   # True olduqda ~1.5 GB yüklənir
+SAMPLE_STREAMS = 20     # hər layihə üçün stream sayı (100 məqalə/stream)
+
+fetched = {}
+failed = []
+
+for sid in cfg["data"]["sources"]:
+    try:
+        src = SourceRegistry.get(sid)
+    except KeyError as exc:
+        print("skip:", exc); continue
+
+    # Locally generated corpora arrive via synthetic_texts, not a download.
+    if src.access == "local":
+        print(f"{sid}: lokal generasiya / locally generated, skip"); continue
+
+    base = src.url.rstrip("/") + "/"
+    try:
+        files = list_wiki_dump_files(base)
+    except Exception as exc:
+        print(f"{sid}: siyahı alınmadı / listing failed: {exc}"); failed.append(sid); continue
+
+    dump = next((f for f in files if "pages-articles-multistream.xml.bz2" in f["name"]), None)
+    index = next((f for f in files if "multistream-index" in f["name"]), None)
+    if not dump or not index:
+        print(f"{sid}: multistream tapılmadı / multistream dump not available"); failed.append(sid); continue
+
+    def abs_url(e):
+        return e["url"] if e["url"].startswith("http") else base + e["url"].lstrip("./")
+
+    out_dir = paths.raw / sid
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    if FULL_DOWNLOAD:
+        print(f"\\n=== {sid}: tam dump / full dump ===")
+        for e in files:
+            if not e["name"].endswith(("multistream.xml.bz2", "multistream-index.txt.bz2")):
+                continue
+            res = download_file(abs_url(e), out_dir / e["name"], expected_bytes=e.get("bytes"))
+            print(f"  {e['name']}: {res.status}")
+        fetched[sid] = out_dir
+    else:
+        print(f"\\n=== {sid}: nümunə / sample ({SAMPLE_STREAMS} stream) ===")
+        idx_path = out_dir / index["name"]
+        download_file(abs_url(index), idx_path)
+        offsets = read_multistream_index(idx_path)
+        xml = extract_wiki_streams(abs_url(dump), offsets, max_streams=SAMPLE_STREAMS)
+        target = out_dir / "sample_articles.xml"
+        target.write_text(xml, encoding="utf-8")
+        print(f"  {xml.count('<page>')} məqalə / articles -> {target.name}")
+        fetched[sid] = out_dir
+
+print("\\n=== yüklənib / fetched:", sorted(fetched), "===")
+if failed:
+    print("YÜKLƏNƏMƏDİ / failed:", failed)
+    print("Bu mənbələr korpusa daxil edilməyəcək / these sources will be skipped.")
 """
     ),
     code(
