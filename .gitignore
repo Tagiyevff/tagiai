@@ -1,0 +1,57 @@
+# TagAI run artefacts - never commit these
+runs/
+outputs/
+checkpoints/
+*.pt
+*.safetensors
+*.bin
+*.ckpt
+*.zip
+tagai_deploy.zip
+
+# Data
+data/
+*.bin
+*.jsonl
+tokenizer/tokenizer_corpus.txt
+
+# Notebooks
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Secrets - never commit
+.env
+*.pem
+*.key
+secrets.json
+credentials.json
+*token*.json
+!tagai/tokenizer/tokenizer_config.json
+
+# Reports are regenerated; keep the directory but not its output
+docs/reports/*.json
+docs/reports/*.md

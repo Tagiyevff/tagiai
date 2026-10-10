@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tagai"
+version = "0.1.0"
+description = "TagAI - an Azerbaijani language model trained from randomly initialized weights"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Tagiyevff" }]
+keywords = ["azerbaijani", "az", "language-model", "transformer", "from-scratch", "nlp"]
+dependencies = [
+    "torch>=2.1",
+    "sentencepiece>=0.1.99",
+    "numpy>=1.24",
+    "tqdm>=4.65",
+    "langdetect>=1.0.9",
+    "safetensors>=0.4.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "matplotlib>=3.7"]
+report = ["matplotlib>=3.7"]
+
+[project.scripts]
+tagai = "tagai.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tagai*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --tb=short"
+markers = [
+    "slow: tests that build a corpus or train a model",
+    "network: tests that require internet access",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"

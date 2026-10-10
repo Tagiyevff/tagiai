@@ -1,0 +1,52 @@
+{
+  // TagAI main run. Batch/accum values below are sized for a 16 GB GPU
+  // (Colab T4 / Kaggle P100). On a 24 GB card raise micro_batch_size to 24.
+  // Effective batch = 32 * 8 * 512 = 131,072 tokens per optimizer step.
+  "paths": { "root": "runs/main" },
+  "data": {
+    "sources": ["azwiki", "azwiktionary", "azwikisource", "azwikiquote", "azwikinews"],
+    "min_chars": 250,
+    "max_chars": 50000,
+    "min_az_ratio": 0.70,
+    "min_latin_ratio": 0.60,
+    "max_repeat_ratio": 0.35,
+    "near_dedupe": true,
+    "near_dedupe_threshold": 0.90,
+    "validation_fraction": 0.002,
+    "synthetic_ratio": 0.02,
+    "seed": 1337
+  },
+  "tokenizer": { "vocab_size": 32000, "model_type": "bpe", "num_threads": 16 },
+  "model": { "preset": "tagai-base" },
+  "train": {
+    "preset": "main",
+    "micro_batch_size": 32,
+    "grad_accum_steps": 8,
+    "max_seq_len": 512,
+    "max_steps": 60000,
+    "max_tokens": 20000000000,
+    "lr": 1e-3,
+    "min_lr_ratio": 0.1,
+    "warmup_steps": 1000,
+    "weight_decay": 0.1,
+    "grad_clip": 1.0,
+    "precision": "auto",
+    "eval_every": 500,
+    "save_every": 1000,
+    "log_every": 50,
+    "seed": 1337,
+    "resume": "auto",
+
+    // Storage budget. Google Drive's free tier is 15 GB for the WHOLE account,
+    // so the durable copy is deliberately minimal: one checkpoint, written
+    // only when validation improves, and never if the volume is nearly full.
+    // Set durable_dir to null to keep everything session-local.
+    "keep_last_checkpoints": 3,
+    "durable_dir": null,
+    "durable_keep_last": 1,
+    "durable_save_optimizer": true,
+    "durable_on_improvement_only": true,
+    "durable_min_steps_between": 250,
+    "durable_min_free_gb": 3.0
+  }
+}

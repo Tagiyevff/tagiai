@@ -1,0 +1,31 @@
+{
+  // TagAI smoke configuration: pipeline validation on any machine in minutes.
+  // This proves the code path works. It is NOT a language model worth using.
+  "paths": { "root": "runs/smoke" },
+  "data": {
+    "sources": ["azwiki"],
+    "min_chars": 300,
+    "max_chars": 30000,
+    "min_az_ratio": 0.70,
+    "near_dedupe": true,
+    "near_dedupe_threshold": 0.90,
+    "validation_fraction": 0.005,
+    "synthetic_ratio": 0.05,
+    "seed": 1337
+  },
+  "tokenizer": { "vocab_size": 8000, "model_type": "bpe", "num_threads": 8 },
+  "model": { "preset": "tagai-tiny" },
+  "train": {
+    "preset": "smoke",
+    "micro_batch_size": 8,
+    "grad_accum_steps": 2,
+    "max_seq_len": 256,
+    "max_steps": 200,
+    "lr": 6e-4,
+    "warmup_steps": 30,
+    "eval_every": 50,
+    "save_every": 100,
+    "log_every": 10,
+    "seed": 1337
+  }
+}

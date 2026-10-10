@@ -1,0 +1,32 @@
+{
+  // TagAI pilot run: the smallest run whose loss curve says something about
+  // learning Azerbaijani. Target: free Colab T4 (16 GB) or Kaggle P100.
+  "paths": { "root": "runs/pilot" },
+  "data": {
+    "sources": ["azwiki", "azwiktionary", "azwikisource", "azwikiquote", "azwikinews"],
+    "min_chars": 300,
+    "max_chars": 40000,
+    "min_az_ratio": 0.70,
+    "min_latin_ratio": 0.60,
+    "near_dedupe": true,
+    "near_dedupe_threshold": 0.90,
+    "validation_fraction": 0.002,
+    "synthetic_ratio": 0.03,
+    "seed": 1337
+  },
+  "tokenizer": { "vocab_size": 16000, "model_type": "bpe", "num_threads": 16 },
+  "model": { "preset": "tagai-small" },
+  "train": {
+    "preset": "pilot",
+    "micro_batch_size": 16,
+    "grad_accum_steps": 4,
+    "max_seq_len": 512,
+    "max_steps": 5000,
+    "lr": 6e-4,
+    "warmup_steps": 300,
+    "eval_every": 250,
+    "save_every": 500,
+    "log_every": 25,
+    "seed": 1337
+  }
+}
