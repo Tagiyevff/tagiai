@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 
 import numpy as np
 import pytest
@@ -160,6 +161,32 @@ def test_retention_never_deletes_the_newest(tiny_run) -> None:
     entries = list_checkpoints(root)
     assert entries[-1].step == 10, "the newest checkpoint was deleted"
     assert len(entries) <= 2
+
+
+def test_free_space_handles_a_path_that_does_not_exist_yet(tmp_path) -> None:
+    """A Drive folder that has never been written to has no local path.
+
+    shutil.disk_usage raises FileNotFoundError on it, which is exactly what
+    broke the first Colab run.
+    """
+    import shutil
+
+    from tagai.training.checkpoint import free_space_gb
+
+    missing = tmp_path / "does" / "not" / "exist" / "yet"
+    assert not missing.exists()
+    with pytest.raises((FileNotFoundError, OSError)):
+        shutil.disk_usage(str(missing))
+
+    free = free_space_gb(missing)
+    assert free > 0.0, "free_space_gb must walk up to the nearest existing parent"
+
+
+def test_free_space_matches_shutil_for_an_existing_path(tmp_path) -> None:
+    from tagai.training.checkpoint import free_space_gb
+
+    expected = shutil.disk_usage(str(tmp_path)).free / 1024**3
+    assert abs(free_space_gb(tmp_path) - expected) < 0.01
 
 
 def test_durable_directory_keeps_only_the_last(tmp_path, tiny_run) -> None:

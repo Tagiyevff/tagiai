@@ -9,11 +9,15 @@ checkpoints/
 *.zip
 tagai_deploy.zip
 
-# Data
-data/
-*.bin
+# Corpus / token artefacts.
+# These patterns MUST be anchored with a leading slash: an unanchored
+# `data/` matches ANY directory named "data" at any depth, which silently
+# excluded the whole `tagai/data/` subpackage from the repository.
+# Run artefacts live under runs/, which is already ignored above.
+/data/
 *.jsonl
-tokenizer/tokenizer_corpus.txt
+/runs/**/tokenizer_corpus.txt
+tokenizer_corpus.txt
 
 # Notebooks
 .ipynb_checkpoints/

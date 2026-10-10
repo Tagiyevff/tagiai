@@ -185,11 +185,16 @@ print("hızlı lokal disk :", WORK)
 print("durable (Drive)  :", DURABLE or "(yok - oturum içinde kalacak)")
 
 if DURABLE is not None:
-    import shutil
-    free = shutil.disk_usage(str(DURABLE)).free / 1024**3
+    # Klasör henüz yok; disk_usage() var olmayan yolda patlar.
+    # free_space_gb() var olan en yakın üst klasöre kadar yükselir.
+    from tagai.training.checkpoint import free_space_gb
+
+    DURABLE.mkdir(parents=True, exist_ok=True)
+    free = free_space_gb(DURABLE)
     print(f"Drive boş alanı: {free:.1f} GB / 15 GB")
     if free < 5:
         print("UYARI: Drive'da az yer var. DURABLE = None yapıp oturumda çalıştır.")
+        print("WARNING: little Drive space left. Set DURABLE = None to run session-only.")
 """
     ),
     md("## 5. Qurulum / Configuration"),
