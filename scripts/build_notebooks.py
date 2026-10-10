@@ -119,7 +119,7 @@ Bu addım GitHub-ı göstərir. Əgər kodu əvvəlcədən yükləmisinizsə, `U
     code(
         """
 #@title 3. Mənbə kodu / Source
-import subprocess, sys, os
+import subprocess, sys, os, shutil
 from pathlib import Path
 
 USER = "Tagiyevff"          # <-- öz GitHub istifadəçi adınız / your GitHub username
@@ -127,22 +127,42 @@ REPO = "tagiai"             # <-- repo adı / repository name
 BRANCH = "main"
 
 WORKDIR = Path("/content/tagai")
-if not (WORKDIR / "tagai" / "model" / "transformer.py").exists():
-    r = subprocess.run(
-        ["git", "clone", "--depth", "1", "-b", BRANCH, f"https://github.com/{USER}/{REPO}.git", str(WORKDIR)],
-        capture_output=True, text=True,
+URL = f"https://github.com/{USER}/{REPO}.git"
+
+# Kohnə/yarım klon varsa silirik: git clone mövcud qovluğa yazmır, yəni
+# bozuk klon üstünde "if not exists" qoruması heç nəsi düzəltmirdi.
+if WORKDIR.exists():
+    shutil.rmtree(WORKDIR)
+
+r = subprocess.run(
+    ["git", "clone", "--depth", "1", "-b", BRANCH, URL, str(WORKDIR)],
+    capture_output=True, text=True,
+)
+print(r.stdout or "", r.stderr or "")
+
+# Yoxlama: tagai/data/ alt paketi klonla birlikdə gəlməlidir.
+# Bu səhifə .gitignore problemi ilə itmişdi və 5-ci hücrədə
+# ModuleNotFoundError: No module named 'tagai.data' verirdi.
+required = [
+    WORKDIR / "tagai" / "model" / "transformer.py",
+    WORKDIR / "tagai" / "data" / "prepare.py",
+    WORKDIR / "tagai" / "data" / "clean.py",
+    WORKDIR / "tagai" / "tokenizer" / "trainer.py",
+    WORKDIR / "tagai" / "training" / "trainer.py",
+]
+missing = [str(p) for p in required if not p.exists()]
+if missing:
+    raise SystemExit(
+        "Repo natamam klonlandı / incomplete clone. Eksik fayllar:\\n  "
+        + "\\n  ".join(missing)
+        + "\\n\\nGitHub'da bu fayllar commit edilməmiş ola bilər - lokal `git push` edin."
     )
-    print(r.stdout or "", r.stderr or "")
-    if not (WORKDIR / "tagai").exists():
-        raise SystemExit(
-            "Mənbə kodu tapıla bilmədi.\\n"
-            "Repo-ni yükləmək üçün hüceyrənin üstündə `git clone` çalışdırın və ya\\n"
-            "faylları birbaşa /content/tagai altına yerləşdirin."
-        )
 
 sys.path.insert(0, str(WORKDIR))
 import tagai
+import tagai.data, tagai.model, tagai.tokenizer, tagai.training
 print("tagai", tagai.__version__, "from", Path(tagai.__file__).parent)
+print("bütün modullar mövcuddur / all modules present")
 """
     ),
     md(

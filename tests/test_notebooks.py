@@ -84,6 +84,27 @@ def test_cells_are_ordered_with_markdown_headers(path: Path) -> None:
             ), f"code cell {i} has no preceding markdown"
 
 
+def test_colab_deletes_a_stale_clone_before_cloning() -> None:
+    """`git clone` will not write into an existing directory.
+
+    An incomplete clone left over from a previous run therefore survives a
+    re-run and fails again at import time. The cell must remove it first.
+    """
+    nb = load(COLAB)
+    text = "\n".join(cell_source(c) for c in nb["cells"])
+    assert "shutil.rmtree" in text, "cell 3 must delete a stale clone directory"
+    assert 'REPO = "tagiai"' in text, "cell 3 must clone the real repository"
+
+
+def test_colab_verifies_the_clone_is_complete() -> None:
+    """A missing subpackage must fail at cell 3 with a clear file list."""
+    nb = load(COLAB)
+    text = "\n".join(cell_source(c) for c in nb["cells"])
+    assert "required = [" in text and "missing" in text
+    assert "tagai\" / \"data\"" in text.replace("'", '"') or '"data"' in text
+    assert "import tagai.data" in text, "cell 3 must import the data subpackage to prove it exists"
+
+
 def test_colab_covers_every_required_stage() -> None:
     """The specification lists 20 required Colab cells; each must be present."""
     nb = load(COLAB)
